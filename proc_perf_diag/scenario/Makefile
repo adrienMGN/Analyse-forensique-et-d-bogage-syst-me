@@ -14,7 +14,7 @@ IO_blocking: IO_blocking.c
 	$(CC) $(CFLAGS) -o $@ $<
 
 memory_leak: memory_leak.c
-	$(CC) $(CFLAGS) -o $@ $<
+	$(CC)  -o $@ $<
 
 zombie_process: zombie_process.c
 	$(CC) $(CFLAGS) -o $@ $<
