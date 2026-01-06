@@ -1,19 +1,33 @@
 #!/usr/bin/env ruby
 
 if ARGV.empty?
-  puts "Usage: ruby audit_proc.rb <PID>"
+  puts "Usage : ruby audit_proc.rb <PID | nom_executable>"
   exit 1
 end
 
 TARGET = ARGV[0]
-REPORT_FILE = "process_report_#{TARGET}.txt"
+REPORT_FILE = "process_report_#{TARGET}.log"
 
 def run(cmd)
   output = `#{cmd} 2>&1`
 end
 
-# resolver PID?
-pid = TARGET
+def resolve_pid(target)
+  return target if target =~ /^\d+$/
+  pids = run("pgrep -x #{target}").split
+
+  if pids.empty?
+    puts "Aucune correspondance"
+    exit 1
+  elsif pids.size > 1
+    puts "Plusieurs correspondances :  #{pids.join(', ')}"
+    exit 1
+  end
+
+  pids.first
+end
+
+pid = resolve_pid(TARGET)
 
 File.open(REPORT_FILE, "w") do |f|
 
@@ -46,4 +60,4 @@ File.open(REPORT_FILE, "w") do |f|
 
 end
 
-puts "report #{REPORT_FILE}"
+puts "rapport: #{REPORT_FILE}"
