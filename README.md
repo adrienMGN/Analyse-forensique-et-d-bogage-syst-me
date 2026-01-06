@@ -1,79 +1,108 @@
-# Analyse forensique et débogage système
+# Analyse Forensique et Débogage Système
 
 ## Analyse de processus et performances
 
+### 1. Localisation des ressources
+
+* **Scénarios de test :** Accessibles dans le dossier `proc_perf_diag/scenario`.
+* **Guide méthodologique :** Le fichier `proc_perf_diag/Methodology.md` décrit les étapes d'implémentation et les indicateurs d'observation.
+
 ---
 
-1)
-Localisation des ressources :
+### 2. Analyse opérationnelle des scénarios
 
-Scénarios de test : accessibles dans le dossier `proc_perf_diag/scenario`.
+#### 2.1 La boucle infinie (`infinite_loop`)
 
-Guide méthodologique : le fichier `proc_perf_diag/Methodology.md` décrit les étapes d'implémentation et les indicateurs d'observation.
-
-2) Analyse opérationnelle des scénarios de test
-   2)1) La boucle infinie
-   
-Avec la commande ps aux (affichage du pourcentage de l'utilisation du cpu et de l'état) :
+**Observation initiale :**
+Pour vérifier l'état du processus, on utilise `ps aux` :
 
 ```bash
 ps aux | awk 'NR==1 || /infinite_loop/'
+
 ```
-En exécution : Le processus est visible et marqué du statut R (Running) et le cpu est à 100%.
 
-À l'arrêt : Le processus disparaît de la table des processus système.
+* **En exécution :** Le processus affiche le statut **R (Running)** et une utilisation CPU de **100%**.
+* **À l'arrêt :** Le processus disparaît immédiatement de la table des processus.
 
-Question : Pourquoi si cpu est à 100% alors le pc ne reussi à executer d'autres commande ou bien ne crache pas ? 
-
-La réponse s'obtient facilement avec `htop`: 
+**Problématique :** Pourquoi le système ne crache-t-il pas malgré un CPU à 100% ?
+L'outil `htop` permet de visualiser la répartition sur les cœurs :
 
 ```bash
 htop -p $(pgrep infinite_loop)
+
 ```
 
-![capture htop](images/htop_infinite_loop.png)
+**Analyse de la charge :**
 
-Analyse de la charge CPU
-Ma configuration de test dispose de 16 cœurs. Comme on peut le voir sur l'image, le lancement de quatre instances du programme infinite_loop mobilise entièrement quatre cœurs (soit 25 % de la capacité totale du processeur).
+* Sur une configuration à **16 cœurs**, une instance à 100% ne représente que **6,25%** de la capacité totale.
+* En lançant 4 instances, on mobilise 4 cœurs (soit 25% du total). Le système reste fluide car il dispose de 12 cœurs libres pour les autres tâches.
 
-Le risque de la "Fork Bomb"
-Cette expérience illustre pourquoi une Fork Bomb est redoutable : il s'agit d'un processus qui se réplique à l'infini et de manière exponentielle jusqu'à saturer la totalité des cœurs et de la mémoire, provoquant ainsi le blocage complet (freeze) de l'ordinateur.
+> **Le risque de la "Fork Bomb" :** > Contrairement à une boucle simple, une Fork Bomb se réplique de manière exponentielle. Elle sature la totalité des cœurs et la table des processus, provoquant un gel (**freeze**) complet de la machine.
 
-Et donc la réponse à la question de tout à l'heure, c'est que `ps aux` affiche 100 %, mais que pour un seul cœur et si on lance plusieurs instance `ps aux` nous montreras plusieurs infinite_loop à 100 %, mais on ne pourra pas savoir où est la limite.
+---
 
-   2)2) Blocage I/O
-   
-Lorsque je lance le programme IO_blocking, celui-ci attend que je saisisse des caractères ou que je tape Ctrl+D pour continuer. Tant que je n'effectue aucune action, le programme reste en attente.
+#### 2.2 Blocage I/O (`IO_blocking`)
 
-En utilisant la commande ps aux, je peux observer son état :
+Le programme est en attente d'une interaction utilisateur (clavier ou `Ctrl+D`).
 
-État S (Interruptible Sleep) : Il s'agit de l'état le plus courant. Mon processus est en sommeil le temps qu'un événement survienne (une touche du clavier ou l'arrivée d'un paquet réseau). Il peut être réveillé à tout moment par un signal.
+**Observation de l'état :**
 
-Afin de visualiser ce qu'il se passe au niveau du noyau, j'utilise l'outil strace pour suivre les appels système du processus en temps réel.
+* **État S (Interruptible Sleep) :** Le processus est en sommeil. Il ne consomme pas de CPU et attend un événement (signal ou entrée réseau/clavier).
+
+**Analyse avec `strace` :**
+Pour voir ce qui se passe au niveau du noyau, on suit les appels système :
 
 ```bash
 sudo strace -p $(pgrep IO_blocking)
-```
-```Plaintext
-strace: Process 60594 attached
-read(0,
-```
-Ici, l'affichage s'arrête sur read(0,. Le chiffre 0 correspond au descripteur de fichier de l'entrée standard (stdin). Cela me confirme que le processus est techniquement bloqué sur une opération de lecture.
 
-Dès que j'interviens (par exemple en envoyant un signal d'interruption), strace affiche la fin de l'appel système et les signaux reçus :
-```Plaintext
-strace: Process 63920 attached
-read(0, "", 1024)                       = 0
-exit_group(0)                           = ?
+```
+
+Le processus se bloque sur : `read(0,` (où `0` est le descripteur de `stdin`).
+
+**Sortie de blocage :**
+Lorsqu'on ferme l'entrée (Ctrl+D) :
+
+```plaintext
+read(0, "", 1024) = 0
+exit_group(0)     = ?
 +++ exited with 0 +++
+
 ```
-`read(0, "", 1024) = 0` : L'appel système read se termine. La valeur de retour 0 indique que la fin du fichier a été atteinte (EOF). Il n'y a plus de données à lire, mais aucune erreur n'est survenue.
 
-`exit_group(0)` : Le programme interprète cette fin de fichier comme une instruction de sortie normale. Il appelle donc exit_group avec le code de retour 0.
+* `read(...) = 0` : Indique la fin de fichier (**EOF**).
+* `exit_group(0)` : Terminaison propre du programme.
 
-`exited with 0` : Le processus se termine avec succès.
+---
 
-   2)3) La fuite mémoire
+#### 2.3 La fuite mémoire (`memory_leak`)
 
+**Définition :** Mémoire réservée par un programme, devenue inaccessible mais non rendue au système.
 
+**Les 3 caractéristiques d'une fuite :**
 
+1. **L'occupation :** Réservation de RAM auprès de l'OS.
+2. **La perte de contrôle :** Perte du pointeur (l'adresse mémoire) ; le programme ne sait plus où est la donnée.
+3. **L'oubli de libération :** Absence de l'instruction `free()`.
+
+**Distinction VIRT vs RES :**
+
+* **VIRT (Mémoire Virtuelle) :** La "promesse" faite par le système via `malloc`.
+* **RES (Mémoire Résidente) :** La mémoire physique réelle utilisée (activée ici par `memset`).
+
+**Diagnostic avec `htop` :**
+En triant par `PERCENT_MEM` (touche `F6`), on observe la colonne `RES` augmenter de **256 Mo** à chaque itération.
+
+> **Piège de l'optimisation :** > Avec les flags `-O2` ou `-O3`, le compilateur supprime le `memset` s'il juge que la mémoire n'est jamais relue. La fuite devient alors invisible dans la colonne `RES`. Il faut compiler sans optimisation pour les tests.
+
+**Protection du noyau (OOM Killer) :**
+Via `strace`, on voit l'appel `mmap` (segment de  octets). Lorsque la RAM est saturée (ex: 6.75 GB), le noyau déclenche le **OOM Killer**.
+
+* **Résultat :** `+++ killed by SIGKILL +++`. Le système sacrifie le processus pour survivre.
+
+**Conséquences majeures :**
+
+* **Thrashing :** Ralentissement extrême dû au passage incessant entre RAM et Swap (disque).
+* **Instabilité :** Les autres applications ne peuvent plus allouer de mémoire et plantent.
+* **Crash :** Arrêt brutal du service (critique en production).
+
+---
