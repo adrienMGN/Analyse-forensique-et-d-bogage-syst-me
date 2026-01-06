@@ -3,6 +3,11 @@
 commandes=(
   "vmstat"
   "iostat"
+  "mpstat"
+  "sudo iotop"
+  "sar -A"
+  "sudo dmesg"
+  "systemd-analyze"
 )
 
 echo "----- Diagnostic système avancé interactif -----"
