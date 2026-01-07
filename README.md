@@ -106,3 +106,65 @@ Via `strace`, on voit l'appel `mmap` (segment de  octets). Lorsque la RAM est sa
 * **Crash :** Arrêt brutal du service (critique en production).
 
 ---
+
+### 2.4 Le processus Zombie (`zombie_process`) 
+
+**Observation concrète :**
+Le lancement du binaire `./zombie_process` génère une structure hiérarchique composée d'un processus parent et de 5 processus fils.
+
+**Identification des PIDs :**
+L'outil `pgrep` liste les identifiants uniques alloués par le noyau :
+
+```bash
+pgrep zombie_process
+# Sortie : 
+128042 (Parent)
+128043
+128044
+128045
+128046
+128047
+
+```
+
+**Analyse de la hiérarchie et des états :**
+L'exécution de `pstree` confirme la filiation directe :
+
+```bash
+pstree 128042
+# Résultat : zombie_process───5*[zombie_process]
+
+```
+
+L'état des processus dans la table `ps` montre que les 5 fils sont en statut **Z (Zombie)**, tandis que le parent est en statut **S (Sleep)**.
+
+**Diagnostic par traçage système (`strace`) :**
+L'analyse de l'activité du parent (PID 128042) via `strace` identifie la cause du blocage :
+
+```bash
+sudo strace -p 128042
+# Sortie : strace: Process 128042 attached
+#          restart_syscall(<... resuming interrupted read ...>
+
+```
+
+Le processus parent est suspendu sur un appel système de lecture (`read`). Il est en attente d'une interaction sur l'entrée standard avant de poursuivre son exécution. Tant que cet appel n'est pas complété, le parent ne peut pas exécuter l'instruction `wait()` nécessaire pour "récolter" le statut de sortie des fils et les libérer de la table des processus.
+
+**Cycle de terminaison :**
+
+1. **Phase de rétention :** Les fils ont terminé leur exécution (`exit`), mais leurs descripteurs restent inscrits dans la table des processus car le parent est occupé par son `syscall`.
+2. **Reprise et Nettoyage :** À la clôture du processus parent, le noyau réattribue les zombies au processus `init` (PID 1) qui procède immédiatement à leur suppression définitive.
+
+---
+
+### 2.5 Le danger critique : Saturation du `pid_max`
+
+Bien qu'un processus zombie ne consomme plus de ressources CPU ou RAM, il demeure une menace pour la stabilité du système en raison de la gestion des identifiants (PIDs).
+
+* **Mécanisme :** Chaque processus, même mort (zombie), occupe un emplacement dans la **table des processus** du noyau pour conserver son code de sortie.
+* **Limite système :** Le nombre total de PIDs est fini. Cette limite est définie dans le fichier `/proc/sys/kernel/pid_max`.
+* **Conséquence d'une prolifération :** Si une application défaillante génère des milliers de zombies sans jamais les récolter, elle finit par atteindre la limite `pid_max`.
+
+> **Impact opérationnel :** Une fois la table saturée, le noyau est incapable d'allouer de nouveaux PIDs. Le système ne peut plus lancer aucune commande (`ls`, `ps`, `sh`), rendant toute intervention technique impossible sans un redémarrage matériel ou l'arrêt forcé du processus parent fautif.
+
+---
