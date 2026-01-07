@@ -1,14 +1,23 @@
 # 4. Outils de diagnostic système avancés
 
+## - 1. Créer un tableau de bord de diagnostic système (format texte ou HTML) agrégeant les informations de tous ces outils.
+
+Le tableau de bord consiste en un script bash de diagnostic système au format texte. Il regroupe plusieurs outils d’analyse système et permet de les exécuter de manière interactive, selon la volonté de l’utilisateur.
+Le script parcourt une liste de commandes prédéfinies et demande systématiquement si le diagnostic doit être lancé. Les résultats sont ensuite affichés directement dans le terminal.
+
+Les commandes sont celles présentés dans le sujet. Il est nécessaire de préalablement installer le paquet `sysstat` (pour `iostat` notamment).
+Pour que la commande sar fonctionne il est aussi nécessaire d'activer le service `sysstat` avec `systemctl` et dans `/etc/default/sysstat`, afin d'avoir un jeu de mesure toutes les 10 minutes.
+Enfin, certaines commande doivent être exécutées en super-utilisateur (`iotop` et `dmesg`).
+
 ## - 2. Identifier et documenter un problème de performance sustème réel ou simulé en utilisant ces outils.
 
-L'exécution de ces commandes sur mon poste personnel en temps normal ne met pas en valeur de problème de performance.  
-Afin d'en simuler un, j'ai utilisé le scénario perte de mémoire 'memory_leak.c' du premier exercice.  
+L'exécution de ces commandes sur mon poste personnel en temps normal ne met pas en valeur de problème de performance.
+Afin d'en simuler un, j'ai utilisé le scénario perte de mémoire `memory_leak.c` du premier exercice.
 Je l'ai lancé jusqu'à avoir une perte de mémoire d'environ 10 Gb, puis j'ai exécuté l'ensemble de mes diagnostiques. Leur résultats est disponible dans le fichier `trace.log` (4212).
 
 ### Sortie de la commande `vmstat`
 
-La commande 'vmstat' révèle déjà un problème de mémoire :
+La commande `vmstat` révèle déjà un problème de mémoire :
 
 ```text
 procs ----------mémoire---------- -échange- -----io---- -système- ------cpu-----
@@ -18,16 +27,14 @@ procs ----------mémoire---------- -échange- -----io---- -système- ------cpu--
 
 On observe dans les colonnes de la mémoire que le swap et le cache sont saturés, et qu'il n'y a presque plus de mémoire libre.
 
-
-
 Rien à signaler sur `iostat`, `mpstat` ou `iotop`.
 
-`sar` ne fait que des relevés périodiques (toutes les 10 minutes dans ma configuration), et l'incident, très court, ne s'est pas produit pendant une mesure.  
+`sar` ne fait que des relevés périodiques (toutes les 10 minutes dans ma configuration), et l'incident, très court, ne s'est pas produit pendant une mesure.
 Le cas contraire, on pourrait constater une hausse des métriques "kbswpfree", "kbswpused", "%swpused", "kbswpcad", "%swpcad".
 
 ### Extraits des logs `dmesg`
 
-Les logs de 'dmesg' sont très longs, mais 'grep' permet néamoins de relever quelques messages utiles Qui témoignent clairement d'un accident mémoire, comme par exemple :
+Les logs de `dmesg` sont très longs, mais `grep` permet néamoins de relever quelques messages utiles qui témoignent clairement d'un accident mémoire, comme par exemple :
 
 ```text
 [ 3457.652054] oom-kill:constraint=CONSTRAINT_NONE,nodemask=(null),cpuset=ce874473016f653bd23ffc32aa15c8495bb82b01e853120a3a9b4517aab368ce,mems_allowed=0,global_oom,task_memcg=/kubepods/burstable/pod3902af1e-8c>
