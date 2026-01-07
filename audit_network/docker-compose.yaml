@@ -1,0 +1,45 @@
+services:
+  lab:
+    build: .
+    container_name: netlab
+    cap_add:
+      - NET_ADMIN
+    volumes:
+      - ./audit_network.rb:/app/audit_network.rb
+      - ./scenario.rb:/app/scenario.rb
+    ports:
+      - "8080:80"
+    networks:
+      internal_net:
+        ipv4_address: 10.50.0.10
+      external_net:
+        ipv4_address: 203.0.113.10
+
+  client:
+    build: .
+    container_name: client
+    cap_add:
+      - NET_ADMIN
+    volumes:
+      - ./audit_network.rb:/app/audit_network.rb
+      - ./scenario.rb:/app/scenario.rb
+    networks:
+      external_net:
+        ipv4_address: 203.0.113.50
+    depends_on:
+      - lab
+    # simu d'une connexion non nroamle
+    command: bash -c "while true; do nc -w 10 203.0.113.10 80 < /dev/null & curl -s --max-time 5 http://203.0.113.10 >/dev/null 2>&1 || true; sleep 5; done"
+
+# 2 reseaux pour simuler un réseau interne et un réseau externe
+networks:
+  internal_net:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 10.50.0.0/24
+  external_net:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 203.0.113.0/24
