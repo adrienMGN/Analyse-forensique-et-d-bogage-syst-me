@@ -316,3 +316,213 @@ Chaque cycle garantit que la donnée a quitté la RAM pour le stockage physique.
 | **T** | Stopped | `ps` (STAT T) | Signal `SIGTSTP` ou Ctrl+Z (`stopped_process`) |
 | **Z** | Zombie | `pstree` (5*[zombie_process]) | Parent n'ayant pas fait de `wait()` |
 | **D** | Uninterruptible Sleep | `ps` (alternance S/D) | Écritures synchrones forcées (`disk_sleep`) |
+
+---
+
+## Diagnostic Réseau
+
+### Scénarios de diagnostic
+
+1. **[Service Web Inaccessible](scenario1-service-inaccessible.md)**
+   - Service en cours d'exécution mais inaccessible
+   - Problèmes de configuration réseau
+   - Pare-feu bloquant localement
+   - Outils : `ss`, `netstat`, `ip`, `iptables`, `nmap`, `tcpdump`
+
+2. **[Latence Réseau Élevée](scenario2-latence-elevee.md)**
+   - Temps de réponse élevés
+   - Goulots d'étranglement réseau
+   - Problèmes de routage
+   - Outils : `ping`, `traceroute`, `mtr`, `ss`, `tcpdump`
+
+3. **[Résolution DNS Défaillante](scenario3-dns-defaillant.md)**
+   - Échec de résolution de noms
+   - Lenteur DNS
+   - Problèmes de configuration
+   - Outils : `dig`, `nslookup`, `host`, `resolvectl`, `tcpdump`
+
+4. **[Pare-feu Bloquant](scenario4-pare-feu-bloquant.md)**
+   - Connexions bloquées par iptables/firewalld/ufw
+   - Identification des règles problématiques
+   - Configuration sécurisée
+   - Outils : `iptables`, `firewalld`, `ufw`, `nmap`, `tcpdump`
+
+## Outils de diagnostic couverts
+
+### Analyse des sockets et connexions
+- **ss** : état des sockets, connexions actives, statistiques TCP
+- **netstat** : alternative legacy à ss
+
+### Configuration réseau
+- **ip** : interfaces, adresses IP, routage, voisinage
+- **ifconfig** : legacy (remplacé par ip)
+
+### Capture et analyse du trafic
+- **tcpdump** : capture de paquets, filtrage, analyse réseau
+
+### Scan et découverte
+- **nmap** : scan de ports, détection de services, identification OS
+- **nc** (netcat) : tests de connectivité basiques
+
+### Latence et routage
+- **ping** : latence ICMP de base
+- **traceroute** : traçage du chemin réseau
+- **mtr** : traceroute continu avec statistiques
+
+### DNS
+- **dig** : requêtes DNS détaillées
+- **nslookup** : résolution simple
+- **host** : résolution rapide
+- **resolvectl** : gestion systemd-resolved
+
+### Pare-feu
+- **iptables** : pare-feu Linux traditionnel
+- **firewalld** : frontend pour iptables (RHEL/CentOS)
+- **ufw** : frontend simple (Ubuntu/Debian)
+- **nft** : nftables, remplaçant moderne d'iptables
+
+## Structure de chaque scénario
+
+Chaque fichier de scénario contient :
+
+1. **Description du problème** : symptômes et contexte
+2. **Démarche de diagnostic complète** : étapes méthodiques
+3. **Commandes détaillées** : syntaxe et options
+4. **Interprétation des résultats** : comprendre les sorties
+7. **Scripts de diagnostic** : automatisation
+
+## Utilisation
+
+### Diagnostic rapide
+
+Pour chaque problème, suivre les étapes dans l'ordre :
+
+1. Identifier les symptômes
+2. Vérifier la configuration de base
+3. Tester localement puis à distance
+4. Capturer et analyser le trafic
+5. Examiner les logs
+6. Appliquer la solution appropriée
+
+### Exemple : Service inaccessible
+
+```bash
+# 1. Vérifier le service
+sudo systemctl status nginx
+
+# 2. Vérifier les ports en écoute
+sudo ss -tlnp | grep 80
+
+# 3. Tester localement
+curl -v http://localhost
+
+# 4. Vérifier le pare-feu
+sudo iptables -L -n -v | grep 80
+
+# 5. Scanner depuis l'extérieur
+nmap -p 80 IP_SERVEUR
+
+# 6. Capturer le trafic
+sudo tcpdump -i any port 80 -v
+```
+
+## Méthodologie générale
+
+### Approche en couches (modèle OSI)
+
+1. **Couche Physique/Liaison** (L1/L2)
+   - Vérifier l'état des interfaces : `ip link show`
+   - Statistiques d'erreurs : `ip -s link show`
+
+2. **Couche Réseau** (L3)
+   - Configuration IP : `ip addr show`
+   - Routage : `ip route show`
+   - Connectivité : `ping`
+
+3. **Couche Transport** (L4)
+   - Ports ouverts : `ss -tlnp`
+   - Connexions établies : `ss -tunap`
+   - Pare-feu : `iptables -L`
+
+4. **Couche Application** (L7)
+   - Services actifs : `systemctl status`
+   - Logs applicatifs
+   - Tests fonctionnels : `curl`, `telnet`
+
+### Questions à se poser
+
+- Le service est-il démarré ?
+- Écoute-t-il sur le bon port et la bonne interface ?
+- Le test local fonctionne-t-il ?
+- La configuration réseau est-elle correcte ?
+- Le pare-feu autorise-t-il le trafic ?
+- Le routage est-il configuré ?
+- Y a-t-il des erreurs dans les logs ?
+- Les performances sont-elles acceptables ?
+
+## Commandes essentielles par catégorie
+
+### État du système réseau
+
+```bash
+# Interfaces réseau
+ip link show                    # État des interfaces
+ip addr show                    # Adresses IP
+ip -s link show                 # Statistiques d'erreurs
+
+# Routage
+ip route show                   # Table de routage
+ip route get 8.8.8.8           # Route pour une destination
+
+# Connexions et sockets
+ss -tulnp                       # Tous les services en écoute
+ss -tunap                       # Toutes les connexions
+ss -s                           # Statistiques générales
+```
+
+### Capture et analyse
+
+```bash
+# Capture simple
+sudo tcpdump -i any -nn host IP
+
+# Capture sur un port
+sudo tcpdump -i any port 80
+
+# Capture dans un fichier
+sudo tcpdump -i any -w capture.pcap
+
+# Analyse
+tcpdump -r capture.pcap
+```
+
+### Pare-feu
+
+```bash
+# Voir les règles
+sudo iptables -L -n -v
+sudo firewall-cmd --list-all
+sudo ufw status verbose
+
+# Autoriser un port
+sudo iptables -A INPUT -p tcp --dport 80 -j ACCEPT
+sudo firewall-cmd --add-port=80/tcp
+sudo ufw allow 80/tcp
+```
+
+### DNS
+
+```bash
+# Résolution basique
+dig google.com
+nslookup google.com
+host google.com
+
+# Résolution détaillée
+dig +trace google.com
+dig @8.8.8.8 google.com
+
+# Configuration
+cat /etc/resolv.conf
+resolvectl status
+```
