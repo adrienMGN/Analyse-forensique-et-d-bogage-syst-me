@@ -39,6 +39,45 @@ htop -p $(pgrep infinite_loop)
 * En lançant 4 instances, on mobilise 4 cœurs (soit 25% du total). Le système reste fluide car il dispose de 12 cœurs libres pour les autres tâches.
 
 > **Le risque de la "Fork Bomb" :** > Contrairement à une boucle simple, une Fork Bomb se réplique de manière exponentielle. Elle sature la totalité des cœurs et la table des processus, provoquant un gel (**freeze**) complet de la machine.
+C’est une excellente intuition. Dans un rapport de forensique, comprendre la différence entre un processus qui "consomme" (CPU Bound) et un processus qui "attend" (I/O ou Timer Bound) est fondamental.
+
+Voici comment intégrer cette analyse à ta section 2.1, en gardant ton style :
+
+---
+
+### 2.1.1 Variantes de la boucle : Consommation vs Attente
+
+**Problématique :** Pourquoi une boucle consomme-t-elle 100% d'un cœur et comment détecter une boucle "silencieuse" ?
+
+#### A. La boucle "CPU-Bound" (sans sleep)
+
+Par défaut, le processus `infinite_loop` tente d'exécuter ses instructions le plus vite possible. Le noyau lui alloue toutes les ressources du cœur disponible car le processus ne rend jamais la main.
+
+* **Observation `strace` :** La sortie est vide.
+
+```bash
+sudo strace -p $(pgrep infinite_loop)
+# strace: Process 141416 attached
+# (Rien ne s'affiche jusqu'au Ctrl+C)
+
+```
+
+* **Analyse :** L'absence de sortie dans `strace` signifie que le processus ne fait aucun **appel système** (syscall). Il reste dans l'espace utilisateur ("User Space"), bouclant sur des calculs internes. C'est pour cela qu'il s'accapare 100% du CPU.
+
+#### B. La boucle "Timer-Bound" (avec sleep)
+
+Si l'on ajoute une instruction `sleep()`, le comportement change radicalement. Le CPU chute à **0%**.
+
+* **Observation `strace` :** On voit le processus interagir avec le noyau.
+
+```bash
+sudo strace -p $(pgrep infinite_loop)
+# clock_nanosleep(CLOCK_REALTIME, 0, {tv_sec=2, tv_nsec=0}, ...) = 0
+
+```
+
+* **Analyse :** Ici, le processus dit explicitement au noyau : *"Endors-moi pendant 2 secondes"*. Le planificateur (scheduler) du noyau retire le processus du CPU et le place en état **S (Sleep)**.
+* **Détection forensique :** Même si le CPU est à 0%, `strace` révèle la boucle infinie en montrant la répétition incessante de l'appel `clock_nanosleep`. Le processus n'est pas "mort", il est juste en attente cyclique.
 
 ---
 
