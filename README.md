@@ -31,6 +31,7 @@ L'outil `htop` permet de visualiser la répartition sur les cœurs :
 htop -p $(pgrep infinite_loop)
 
 ```
+![photo htop](images/htop_infinite_loop.png)
 
 **Analyse de la charge :**
 
