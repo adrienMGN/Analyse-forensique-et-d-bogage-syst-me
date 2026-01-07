@@ -18,8 +18,7 @@ services_exposes = []
   if ligne =~ /(tcp|udp)\s+\S+\s+\d+\s+\d+\s+(\S+):(\d+)/
     proto, ip, port = $1, $2, $3.to_i
     services_exposes << "#{proto}/#{port} sur #{ip}"
-    puts "  #{proto}/#{port} sur #{ip}"
-    puts "    [ATTENTIN] Service sensible exposé" if (ip == '0.0.0.0' || ip == '::') && PORTS_SENSIBLES.include?(port)
+    puts "  #{proto}/#{port} sur #{ip}" + ((ip == '0.0.0.0' || ip == '::') && PORTS_SENSIBLES.include?(port) ? " [ATTENTION] Service sensible exposé" : "")
   end
 end
 puts services_exposes.empty? ? "Aucun service exposé" : "Total: #{services_exposes.size} services"
