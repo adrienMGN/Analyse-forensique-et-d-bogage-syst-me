@@ -132,6 +132,8 @@ exit_group(0)     = ?
 **Diagnostic avec `htop` :**
 En triant par `PERCENT_MEM` (touche `F6`), on observe la colonne `RES` augmenter de **256 Mo** à chaque itération.
 
+![photo htop](images/htop_memory_leak.png)
+
 > **Piège de l'optimisation :** > Avec les flags `-O2` ou `-O3`, le compilateur supprime le `memset` s'il juge que la mémoire n'est jamais relue. La fuite devient alors invisible dans la colonne `RES`. Il faut compiler sans optimisation pour les tests.
 
 **Protection du noyau (OOM Killer) :**
