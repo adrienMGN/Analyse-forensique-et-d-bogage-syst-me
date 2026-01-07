@@ -168,3 +168,50 @@ Bien qu'un processus zombie ne consomme plus de ressources CPU ou RAM, il demeur
 > **Impact opérationnel :** Une fois la table saturée, le noyau est incapable d'allouer de nouveaux PIDs. Le système ne peut plus lancer aucune commande (`ls`, `ps`, `sh`), rendant toute intervention technique impossible sans un redémarrage matériel ou l'arrêt forcé du processus parent fautif.
 
 ---
+
+### 2.6 Le processus stoppé (`stopped_process`)
+
+**Observation du comportement :**
+Le binaire `./stopped_process` simule un état de suspension volontaire. À l'exécution, le programme s'interrompt de lui-même après avoir affiché ses informations de contrôle.
+
+**Analyse de l'état via `ps` :**
+L'examen de la table des processus montre deux états distincts selon le moment de l'observation :
+
+```bash
+baloo     112485  0.0  0.0   2680  1536 pts/3    T    16:37   0:00 ./stopped_process
+baloo     112748  0.0  0.0   2680  1536 pts/3    S+   16:38   0:00 ./stopped_process
+
+```
+
+* **État T (Stopped) :** Le processus est suspendu. Il est toujours présent en mémoire mais le kernel ne lui alloue plus de temps CPU.
+* **État S+ (Interruptible Sleep) :** Le processus est en attente d'un événement au premier plan (foreground).
+
+**Interactions utilisateur et signaux :**
+Dans un usage quotidien, cet état **T** est généralement provoqué manuellement par l'utilisateur via la combinaison de touches **`Ctrl+Z`** (envoie le signal `SIGTSTP`).
+
+La gestion de ces processus suspendus s'effectue avec les commandes de contrôle de job :
+
+* **`jobs`** : Liste les processus stoppés dans le shell courant.
+* **`fg` (Foreground)** : Reprend l'exécution du processus au premier plan.
+* **`bg` (Background)** : Reprend l'exécution en arrière-plan.
+* **`kill -CONT <PID>`** : Envoie le signal de continuation au niveau du noyau, indépendamment du shell.
+
+**Analyse de la terminaison avec `strace` :**
+L'utilisation de `strace` lors de l'arrêt forcé du processus (via `kill -TERM`) révèle la réception du signal par le noyau :
+
+```bash
+sudo strace -p 129889
+# Sortie :
+# restart_syscall(<... resuming interrupted read ...>) = ? ERESTART_RESTARTBLOCK (Interrupted by signal)
+# --- SIGTERM {si_signo=SIGTERM, si_code=SI_USER, si_pid=130300, si_uid=1000} ---
+# +++ killed by SIGTERM +++
+
+```
+
+**Décryptage de la trace :**
+
+1. **`RESTART_RESTARTBLOCK`** : Le processus était initialement bloqué sur un appel système (`read`). Le noyau tente de redémarrer cet appel après une interruption.
+2. **`SIGTERM`** : On identifie ici la source de l'arrêt. Le champ `si_pid=130300` indique précisément quel processus a envoyé l'ordre de fermeture, et `si_uid=1000` confirme qu'il s'agit de l'utilisateur (baloo).
+3. **`killed by SIGTERM`** : Le processus ne traite pas le signal lui-même (pas de gestionnaire d'exception) ; c'est le noyau qui met fin au processus de manière propre.
+
+
