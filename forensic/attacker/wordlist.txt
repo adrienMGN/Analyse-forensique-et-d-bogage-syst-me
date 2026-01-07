@@ -1,0 +1,8 @@
+DACS
+password
+admin
+root
+123456
+qwerty
+letmein
+welcome

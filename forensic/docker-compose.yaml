@@ -1,0 +1,27 @@
+services:
+  victim:
+    build: ./victim
+    container_name: victim_srv
+    privileged: true
+    volumes:
+      - /sys/fs/cgroup:/sys/fs/cgroup:rw
+    ports:
+      - "2222:22"
+    networks:
+      - incident_net
+    # Initialisation au premier démarrage
+    command: bash -c "/usr/local/bin/setup.sh && exec /lib/systemd/systemd"
+
+  attacker:
+    build: ./attacker
+    container_name: attacker_pc
+    cap_add:
+      - NET_ADMIN
+      - NET_RAW
+    networks:
+      - incident_net
+    depends_on:
+      - victim
+
+networks:
+  incident_net:
