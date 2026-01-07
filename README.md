@@ -214,4 +214,63 @@ sudo strace -p 129889
 2. **`SIGTERM`** : On identifie ici la source de l'arrêt. Le champ `si_pid=130300` indique précisément quel processus a envoyé l'ordre de fermeture, et `si_uid=1000` confirme qu'il s'agit de l'utilisateur (baloo).
 3. **`killed by SIGTERM`** : Le processus ne traite pas le signal lui-même (pas de gestionnaire d'exception) ; c'est le noyau qui met fin au processus de manière propre.
 
+Voici la suite de ton rapport, intégrant l'analyse technique du code source et les résultats de tes investigations avec `lsof` et `strace`.
 
+---
+
+### 2.7 Sommeil ininterruptible (`disk_sleep`)
+
+**Observation du comportement :**
+Le binaire `./disk_sleep` simule un état de sommeil ininterruptible (**état D**), un état critique où le processus attend une réponse matérielle (généralement du stockage) et ne peut pas être interrompu par des signaux, même par un `kill -9`.
+
+**Analyse du mécanisme (Code Source) :**
+Pour forcer cet état, le programme utilise trois leviers de synchronisation I/O :
+
+1. **`O_SYNC`** : Le fichier est ouvert de manière à ce que chaque écriture soit immédiatement écrite sur le disque physique.
+2. **`write()` de 1 MB** : Des blocs de données conséquents sont envoyés pour saturer le cache.
+3. **`sync()` et `fsync()**` : Ces appels forcent le noyau à vider tous les buffers vers le matériel, mettant le processus en attente directe du contrôleur de disque.
+
+**Diagnostic de l'état via `watch` et `ps` :**
+L'observation en temps réel montre une alternance rapide :
+
+* **État S (Interruptible Sleep)** : Le processus attend durant le `usleep(100000)`.
+* **État D (Uninterruptible Sleep)** : Durant les appels `sync()` et `fsync()`, le processus bascule brièvement en état **D**. Si le disque était plus lent (ou un montage réseau NFS instable), le processus resterait figé en **D**.
+
+**Analyse des fichiers ouverts (`lsof`) :**
+La commande `lsof` permet d'identifier la cible des écritures :
+
+```bash
+COMMAND     PID   USER   FD   TYPE DEVICE  SIZE/OFF      NODE NAME
+disk_slee 137912 baloo   3w   REG  259,6 285212672 23855125 /tmp/disk_sleep_test.dat
+
+```
+
+On constate que le File Descriptor **3w** (Write) pointe vers `/tmp/disk_sleep_test.dat`. La taille (`SIZE/OFF`) augmente rapidement à chaque itération, confirmant le flux d'écriture massif.
+
+**Traçage des appels système (`strace`) :**
+Le traçage spécifique des appels I/O confirme la boucle infinie de synchronisation :
+
+```bash
+sudo strace -p 137912 -e trace=write,sync,fsync
+# Sortie :
+# write(3, "DDDD...", 1048576) = 1048576
+# sync()                        = 0
+# fsync(3)                      = 0
+
+```
+
+Chaque cycle garantit que la donnée a quitté la RAM pour le stockage physique. C'est durant l'exécution de `sync()` que le processus est considéré par le noyau comme "non interruptible" afin d'éviter toute corruption de données.
+
+> **Risque Forensique (Processus "Incassable") :** Un processus bloqué en état **D** de façon prolongée est souvent le signe d'une défaillance matérielle (disque défectueux) ou d'un problème réseau (partage NFS déconnecté). Comme il ignore les signaux, il ne peut pas être tué. Une accumulation de processus en état **D** fait monter la **Load Average** de manière artificielle et peut mener au gel complet du système.
+
+---
+
+### 3. Tableau Récapitulatif des États de Processus Observés
+
+| État | Désignation | Observation via Outils | Cause dans nos scénarios |
+| --- | --- | --- | --- |
+| **R** | Running | `htop` (100% CPU) | Boucle infinie (`infinite_loop`) |
+| **S** | Interruptible Sleep | `strace` (bloqué sur `read`) | Attente I/O ou `sleep` (`IO_blocking`) |
+| **T** | Stopped | `ps` (STAT T) | Signal `SIGTSTP` ou Ctrl+Z (`stopped_process`) |
+| **Z** | Zombie | `pstree` (5*[zombie_process]) | Parent n'ayant pas fait de `wait()` |
+| **D** | Uninterruptible Sleep | `ps` (alternance S/D) | Écritures synchrones forcées (`disk_sleep`) |
