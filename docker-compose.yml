@@ -1,0 +1,23 @@
+services:
+  audit:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: system-audit
+
+    # variabales d'environnement pour la connexion SSH (utilisé par le script Ruby)
+    environment:
+      # Pour Linux : utiliser l'IP du bridge Docker
+      - TARGET_HOST=172.17.0.1 # adresse de la machine hôte depuis le conteneur 
+      - TARGET_USER=root # utilisateur SSH 
+      - SSH_KEY_PATH=/root/.ssh/id_rsa # chemin vers la clé privée SSH dans le conteneur
+
+    volumes:
+      - ./ssh-keys/id_rsa:/root/.ssh/id_rsa:ro # Montage de la clé SSH privée en lecture seule
+      - ./output:/output # Montage du répertoire de sortie
+
+    # Utiliser le réseau par défaut de Docker
+    network_mode: bridge
+
+    # Commande pour garder le conteneur actif
+    command: tail -f /dev/null
