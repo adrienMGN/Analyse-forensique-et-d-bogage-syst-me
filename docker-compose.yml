@@ -18,3 +18,6 @@ services:
 
     # Utiliser le réseau par défaut de Docker
     network_mode: bridge
+
+    # Commande pour garder le conteneur actif
+    command: tail -f /dev/null

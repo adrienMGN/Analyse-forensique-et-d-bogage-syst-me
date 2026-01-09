@@ -1,6 +1,7 @@
 FROM debian:bookworm
 
 LABEL description="Container d'orchestration des scripts d'audit via SSH"
+ENV DEBIAN_FRONTEND noninteractive
 
 ENV LANG=C.UTF-8
 ENV LC_ALL=C.UTF-8
@@ -26,7 +27,6 @@ RUN apt-get update && apt-get install -y \
     vim \
     netcat-traditional \
     sysstat \
-    systemd \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
@@ -36,7 +36,7 @@ COPY orchestrator.rb /app/orchestrator.rb
 
 # copy des scripts d'audit (network, diag_sys avancé.sh, audit_proc.rd)
 COPY audit_network/audit_network.rb /app/audit_network.rb
-COPY ./diag_sys_avance/4_diag_sys_avance.sh /app/diag_sys_avance.sh
+COPY ./diag_sys_avance.sh /app/diag_sys_avance.sh
 COPY ./audit_proc/audit_proc.rb /app/audit_proc.rb
 
 
@@ -50,18 +50,9 @@ RUN chmod +x /app/audit_proc.rb
 # Configuration SSH (dir, droits, StrictHostKeyChecking pour éviter les prompts, droit de config)
 RUN mkdir -p /root/.ssh && \
     chmod 700 /root/.ssh && \
+    touch /root/.ssh/id_rsa && \
+    chmod 600 /root/.ssh/id_rsa && \
     echo "StrictHostKeyChecking no" > /root/.ssh/config && \
     chmod 600 /root/.ssh/config
 
 
-# Systemd cleanup
-RUN rm -f /lib/systemd/system/multi-user.target.wants/* \
-    /etc/systemd/system/*.wants/* \
-    /lib/systemd/system/local-fs.target.wants/* \
-    /lib/systemd/system/sockets.target.wants/*udev* \
-    /lib/systemd/system/sockets.target.wants/*initctl* \
-    /lib/systemd/system/sysinit.target.wants/systemd-tmpfiles-setup* \
-    /lib/systemd/system/systemd-update-utmp*
-
-VOLUME [ "/sys/fs/cgroup" ]
-CMD ["/lib/systemd/systemd"]
