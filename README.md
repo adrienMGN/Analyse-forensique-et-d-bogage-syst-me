@@ -323,25 +323,25 @@ Chaque cycle garantit que la donnée a quitté la RAM pour le stockage physique.
 
 ### Scénarios de diagnostic
 
-1. **[Service Web Inaccessible](scenario1-service-inaccessible.md)**
+1. **[Service Web Inaccessible](audit_network/scenario/scenario1-service-inaccessible.md)**
    - Service en cours d'exécution mais inaccessible
    - Problèmes de configuration réseau
    - Pare-feu bloquant localement
    - Outils : `ss`, `netstat`, `ip`, `iptables`, `nmap`, `tcpdump`
 
-2. **[Latence Réseau Élevée](scenario2-latence-elevee.md)**
+2. **[Latence Réseau Élevée](audit_network/scenario/scenario2-latence-elevee.md)**
    - Temps de réponse élevés
    - Goulots d'étranglement réseau
    - Problèmes de routage
    - Outils : `ping`, `traceroute`, `mtr`, `ss`, `tcpdump`
 
-3. **[Résolution DNS Défaillante](scenario3-dns-defaillant.md)**
+3. **[Résolution DNS Défaillante](audit_network/scenario/scenario3-dns-defaillant.md)**
    - Échec de résolution de noms
    - Lenteur DNS
    - Problèmes de configuration
    - Outils : `dig`, `nslookup`, `host`, `resolvectl`, `tcpdump`
 
-4. **[Pare-feu Bloquant](scenario4-pare-feu-bloquant.md)**
+4. **[Pare-feu Bloquant](audit_network/scenario/scenario4-pare-feu-bloquant.md)**
    - Connexions bloquées par iptables/firewalld/ufw
    - Identification des règles problématiques
    - Configuration sécurisée
