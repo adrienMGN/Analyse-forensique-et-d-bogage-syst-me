@@ -165,7 +165,7 @@ end
 if ENABLE_LOG
   puts "\n#{Colors::BLUE}#{Colors::BOLD}[Analyse des logs]#{Colors::RESET}"
   puts "#{Colors::CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━#{Colors::RESET}"
-  log_output = run_remote("bash /tmp/audit_scripts/analyse.sh -o /home/adri/cours/Analyse-forensique-et-d-bogage-syst-me/suspect.log")
+  log_output = run_remote("bash /tmp/audit_scripts/analyse.sh -o /tmp/suspect.log -s -n 1")
   puts log_output
 end
 
