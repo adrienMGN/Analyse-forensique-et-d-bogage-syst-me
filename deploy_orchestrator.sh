@@ -17,7 +17,6 @@ fi
 
 
 # 2. Créer le répertoire de sortie AVANT de générer les clés
-mkdir -p output
 mkdir -p ssh-keys
 
 # 3. Générer les clés SSH si elles n'existent pas

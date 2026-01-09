@@ -37,7 +37,7 @@ COPY orchestrator.rb /app/orchestrator.rb
 # copy des scripts d'audit (network, diag_sys avancé.sh, audit_proc.rd)
 COPY audit_network/audit_network.rb /app/audit_network.rb
 COPY ./diag_sys_avance.sh /app/diag_sys_avance.sh
-COPY ./audit_proc/audit_proc.rb /app/audit_proc.rb
+COPY ./proc_perf_diag/audit_proc/audit_proc.rb /app/audit_proc.rb
 
 
 
