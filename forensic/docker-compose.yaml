@@ -5,7 +5,7 @@ services:
     privileged: true
     volumes:
       - /sys/fs/cgroup:/sys/fs/cgroup:rw
-      - ./Analyse-forensique-et-d-bogage-syst-me/forensic/analyse.sh:/app/analyse.sh
+      - ./analyse.sh:/app/analyse.sh
     ports:
       - "2222:22"
     networks:
