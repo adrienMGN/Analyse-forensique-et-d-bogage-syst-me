@@ -46,6 +46,15 @@ OptionParser.new do |opt|
     options[:network] = true
     options[:diag] = true
   end
+
+  #### AJOUTER SCRIPT DE LOG #####
+
+  opt.on("-l", "--log", "Analyse des logs") do
+    options[:log] = true
+  end
+
+  ################################
+
   
   opt.on("-h", "--help", "Afficher cette aide") do
     puts opt
@@ -54,12 +63,13 @@ OptionParser.new do |opt|
     puts "  orchestrator.rb -n              # Uniquement réseau"
     puts "  orchestrator.rb -d              # Uniquement diagnostic"
     puts "  orchestrator.rb -p 1234 -n      # Réseau + processus 1234"
+    puts "  orchestrator.rb -l              # Analyse des logs"
     exit
   end
 end.parse!
 
 # Si aucune option, afficher l'aide
-if !options[:network] && !options[:pid] && !options[:diag]
+if !options[:network] && !options[:pid] && !options[:diag] && !options[:log]
   puts "#{Colors::YELLOW}Aucun audit sélectionné. Utilisez -h pour voir les options.#{Colors::RESET}"
   puts "\nExemple rapide: orchestrator.rb -a"
   exit 1
@@ -71,12 +81,14 @@ PID = options[:pid]
 ENABLE_NETWORK = options[:network]
 ENABLE_PROCESS = !PID.nil?
 ENABLE_DIAG = options[:diag]
+ENABLE_LOG = options[:log]
+
 
 ######################## Execution distante ########################
 # Configuration SSH pour exécuter les commandes sur la machine distante
 HOST = ENV['TARGET_HOST'] || 'host.docker.internal' # adresse de la machine distante
 USER = ENV['TARGET_USER'] || 'root' # utilisateur SSH 
-KEY  = ENV['SSH_KEY_PATH'] || '/root/.ssh/id_rsa' # chemin vers la clé privée SSH dans le conteneur
+KEY  = ENV['SSH_KEY_PATH'] || '/root/.ssh/id_rsa' # chemin vers la clé privée SSH dans le conteneurs
 
 # Fonction pour exécuter une commande distante via SSH
 def run_remote(cmd, hide_errors = false)
@@ -87,7 +99,7 @@ def run_remote(cmd, hide_errors = false)
   return result
 end
 
-# Fonction pour copier un fichier sur l'hôte distant via SCP
+# Fonction pour copier un fichier sur l'hôte distant via SCP (c'est plus simmle flm de se battre avec des trucs obscurs)
 def copy_to_remote(local_path, remote_path)
   scp_cmd = "scp -q -o StrictHostKeyChecking=no -i #{KEY} #{local_path} #{USER}@#{HOST}:#{remote_path}"
   system(scp_cmd)
@@ -118,6 +130,7 @@ run_remote("mkdir -p /tmp/audit_scripts")
 copy_to_remote("/app/audit_network.rb", "/tmp/audit_scripts/audit_network.rb") if ENABLE_NETWORK
 copy_to_remote("/app/audit_proc.rb", "/tmp/audit_scripts/audit_proc.rb") if ENABLE_PROCESS
 copy_to_remote("/app/diag_sys_avance.sh", "/tmp/audit_scripts/diag_sys_avance.sh") if ENABLE_DIAG
+copy_to_remote("/app/analyse.sh", "/tmp/audit_scripts/analyse.sh") if ENABLE_LOG
 run_remote("chmod +x /tmp/audit_scripts/* 2>/dev/null")
 puts "#{Colors::GREEN}✓ Scripts copiés#{Colors::RESET}"
 STDOUT.flush
@@ -148,49 +161,15 @@ if ENABLE_DIAG
   puts diag_output
 end
 
-puts "\n#{Colors::GREEN}#{Colors::BOLD}════════════════════════════════════════════════════════════════════════════════#{Colors::RESET}"
-puts "#{Colors::GREEN}#{Colors::BOLD}                     AUDIT SYSTÈME TERMINÉ                                      #{Colors::RESET}"
-puts "#{Colors::GREEN}#{Colors::BOLD}════════════════════════════════════════════════════════════════════════════════#{Colors::RESET}\n"
-run_remote("mkdir -p /tmp/audit_scripts")
-copy_to_remote("/app/audit_network.rb", "/tmp/audit_scripts/audit_network.rb")
-copy_to_remote("/app/audit_proc.rb", "/tmp/audit_scripts/audit_proc.rb")
-copy_to_remote("/app/diag_sys_avance.sh", "/tmp/audit_scripts/diag_sys_avance.sh")
-run_remote("chmod +x /tmp/audit_scripts/*.rb /tmp/audit_scripts/*.sh")
-puts "#{Colors::GREEN}✓ Scripts copiés avec succès#{Colors::RESET}"
-STDOUT.flush
-
-# 1. Audit réseau
-puts "\n#{Colors::BLUE}#{Colors::BOLD}[1/3] Lancement de l'audit réseau...#{Colors::RESET}"
-puts "#{Colors::CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━#{Colors::RESET}"
-STDOUT.flush
-network_output = run_remote("ruby /tmp/audit_scripts/audit_network.rb")
-puts network_output
-STDOUT.flush
-
-# 2. Audit processus (si PID spécifié)
-if PID
-  puts "\n#{Colors::BLUE}#{Colors::BOLD}[2/3] Lancement de l'audit processus pour PID #{PID}...#{Colors::RESET}"
+# 4. Analyse des logs
+if ENABLE_LOG
+  puts "\n#{Colors::BLUE}#{Colors::BOLD}[Analyse des logs]#{Colors::RESET}"
   puts "#{Colors::CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━#{Colors::RESET}"
-  proc_output = run_remote("ruby /tmp/audit_scripts/audit_proc.rb #{PID}")
-  puts proc_output
-  # Récupérer le fichier de rapport si créé
-  report_file = "process_report_#{PID}.log"
-  report_content = run_remote("cat #{report_file} 2>/dev/null")
-  if !report_content.empty?
-    puts "\n#{Colors::GREEN}Contenu du rapport détaillé:#{Colors::RESET}"
-    puts report_content
-  end
-else
-  puts "\n#{Colors::YELLOW}#{Colors::BOLD}[2/3] Audit processus ignoré (aucun PID spécifié avec -p)#{Colors::RESET}"
+  log_output = run_remote("bash /tmp/audit_scripts/analyse.sh -o /home/adri/cours/Analyse-forensique-et-d-bogage-syst-me/suspect.log")
+  puts log_output
 end
 
-# 3. Diagnostic système avancé
-puts "\n#{Colors::BLUE}#{Colors::BOLD}[3/3] Lancement du diagnostic système avancé...#{Colors::RESET}"
-puts "#{Colors::CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━#{Colors::RESET}"
-diag_output = run_remote("bash /tmp/audit_scripts/diag_sys_avance.sh")
-puts diag_output
-
 puts "\n#{Colors::GREEN}#{Colors::BOLD}════════════════════════════════════════════════════════════════════════════════#{Colors::RESET}"
-puts "#{Colors::GREEN}#{Colors::BOLD}                     AUDIT SYSTÈME TERMINÉ AVEC SUCCÈS                          #{Colors::RESET}"
+puts "#{Colors::GREEN}#{Colors::BOLD}                     AUDIT SYSTÈME TERMINÉ                                      #{Colors::RESET}"
 puts "#{Colors::GREEN}#{Colors::BOLD}════════════════════════════════════════════════════════════════════════════════#{Colors::RESET}\n"
 

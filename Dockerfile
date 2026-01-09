@@ -34,10 +34,11 @@ WORKDIR /app
 # Copie du script d'orchestration d'audit
 COPY orchestrator.rb /app/orchestrator.rb
 
-# copy des scripts d'audit (network, diag_sys avancé.sh, audit_proc.rd)
+# copy des scripts d'audit (network, diag_sys avancé.sh, audit_proc.rd, analyse_log.sh)
 COPY audit_network/audit_network.rb /app/audit_network.rb
 COPY ./diag_sys_avance.sh /app/diag_sys_avance.sh
 COPY ./proc_perf_diag/audit_proc/audit_proc.rb /app/audit_proc.rb
+COPY ./forensic/analyse.sh /app/analyse.sh
 
 
 
@@ -46,6 +47,7 @@ RUN chmod +x /app/orchestrator.rb
 RUN chmod +x /app/diag_sys_avance.sh
 RUN chmod +x /app/audit_network.rb
 RUN chmod +x /app/audit_proc.rb
+RUN chmod +x /app/analyse.sh
 
 # Configuration SSH (dir, droits, StrictHostKeyChecking pour éviter les prompts, droit de config)
 RUN mkdir -p /root/.ssh && \
