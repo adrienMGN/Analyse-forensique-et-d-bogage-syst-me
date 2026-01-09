@@ -16,3 +16,13 @@ sshpass -p 123456 ssh employe@victim_srv
 # 3. Actions post-compromission (laisser des traces)
 touch /tmp/malware_dropper.sh
 sudo systemctl stop nginx
+
+## Scénario attaque 2
+ssh employe@victim_srv
+
+# 1. Arrêt d'un service critique (simulé ici par nginx)
+sudo systemctl stop nginx
+
+# 2. Saturation disque (création d'un fichier géant)
+# fallocate est rapide pour simuler ça
+fallocate -l 1G /var/log/gros_fichier.log
