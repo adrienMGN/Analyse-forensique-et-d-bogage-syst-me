@@ -671,12 +671,6 @@ L'investigation se concentre sur la corrélation entre l'état des services et l
 
 ---
 
-C'est une excellente mise à jour. L'ajout de l'analyse automatisée des journaux (`analyse.sh`) complète la boucle du diagnostic en passant de la surveillance des ressources (CPU/RAM/Réseau) à l'étude des **intentions** et des **traces historiques**.
-
-Voici la mise à jour de ton rapport, intégrant ce nouveau module dans la documentation d'automatisation.
-
----
-
 # 5. Automatisation et conteneurisation
 
 * **Dépôt des sources :** Accessible dans le dossier `forensic/audit_logs/`.
@@ -687,17 +681,6 @@ Voici la mise à jour de ton rapport, intégrant ce nouveau module dans la docum
 
 Le conteneur **Audit-Orchestrator** inclut quatre modules piliers pour une couverture à 360° de la machine cible.
 
-### Mise à jour du Dockerfile
-
-L'image intègre désormais le script `analyse.sh` et les dépendances nécessaires au traitement de texte intensif (`grep`, `awk`, `sed`).
-
-```dockerfile
-# ... (extraits du Dockerfile)
-COPY ./analyse.sh /app/analyse.sh
-RUN chmod +x /app/analyse.sh
-
-```
-
 ---
 
 ## 5.2 L'Orchestrateur : Focus sur l'Analyse de Logs
@@ -707,21 +690,10 @@ Le script `orchestrator.rb` permet désormais de lancer une recherche de menaces
 ### Commande d'activation
 
 ```bash
-ruby orchestrator.rb -l
+ruby orchestrator.rb -h
 
 ```
 
-### Fonctionnement du module `analyse.sh`
-
-Lorsqu'il est activé, l'orchestrateur déploie le script sur la cible et cible prioritairement les fichiers critiques (ex: `auth.log`, `syslog`, ou un fichier suspect spécifique).
-
-**Ce que le script recherche automatiquement :**
-
-* **Tentatives de Brute Force :** Extraction des IPs sources répétitives.
-* **Élévations de privilèges :** Analyse des commandes `sudo` inhabituelles.
-* **Signaux d'intrusion :** Détection de mots-clés comme "Accepted password", "session opened for user root", ou "segfault".
-
----
 
 ## 5.3 Documentation d'utilisation par contexte
 
@@ -733,13 +705,13 @@ L'ajout de l'option `-l` modifie les stratégies d'utilisation :
 
 * **Commande :**
 ```bash
-ruby orchestrator.rb -a -l
+ruby orchestrator.rb -a
 
 ```
 
 
 * **Synergie :** * `-a` (All) : Récupère l'état actuel (ports ouverts, processus résidant).
-* `-l` (Log) : Remonte dans le temps pour voir comment l'attaquant est entré.
+* `-l` (Log qui est compris dans -a) : Remonte dans le temps pour voir comment l'attaquant est entré.
 
 
 * **Cas d'usage :** Analyse d'une machine compromise après la détection d'un fichier suspect (ex: `suspect.log`).
