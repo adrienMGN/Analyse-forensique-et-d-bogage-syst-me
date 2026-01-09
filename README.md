@@ -253,7 +253,6 @@ sudo strace -p 129889
 2. **`SIGTERM`** : On identifie ici la source de l'arrêt. Le champ `si_pid=130300` indique précisément quel processus a envoyé l'ordre de fermeture, et `si_uid=1000` confirme qu'il s'agit de l'utilisateur (baloo).
 3. **`killed by SIGTERM`** : Le processus ne traite pas le signal lui-même (pas de gestionnaire d'exception) ; c'est le noyau qui met fin au processus de manière propre.
 
-Voici la suite de ton rapport, intégrant l'analyse technique du code source et les résultats de tes investigations avec `lsof` et `strace`.
 
 ---
 
