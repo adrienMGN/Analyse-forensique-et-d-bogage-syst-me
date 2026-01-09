@@ -385,7 +385,6 @@ Script disponible dans le dossier `proc_perf_diag/audit_proc/audit_proc.rb`.
 
 ### Pare-feu
 - **iptables** : pare-feu Linux traditionnel
-- **firewalld** : frontend pour iptables (RHEL/CentOS)
 - **ufw** : frontend simple (Ubuntu/Debian)
 - **nft** : nftables, remplaçant moderne d'iptables
 
