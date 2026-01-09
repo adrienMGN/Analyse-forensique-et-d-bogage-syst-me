@@ -562,3 +562,116 @@ Le script articule son diagnostic autour de **trois axes critiques** :
 * **État du Filtrage :** Interroge `iptables` (si exécuté avec les privilèges `root`) pour confirmer la présence de règles de filtrage actives.
 
 ---
+
+Voici la suite de ton rapport, structurée selon tes directives et conservant la mise en forme rigoureuse des sections précédentes.
+
+---
+
+# 4. Analyse de logs et investigation post-incident
+
+* **Localisation des ressources :** Les scénarios et scripts d'audit sont accessibles dans le dossier `forensic/`.
+* **Objectif :** Reconstituer la chaîne d'attaque (Kill Chain) sur une infrastructure Dockerisée et identifier les traces persistantes.
+
+---
+
+## 4.1 Scénario 1 : Compromission de compte (Brute Force SSH)
+
+### A. Contexte
+
+Une alerte a été levée suite à l'arrêt inopiné du service Nginx sur le serveur de production `victim_srv`. L'investigation porte sur une suspicion d'accès non autorisé via le protocole SSH.
+
+### B. Méthodologie d'investigation
+
+L'approche privilégie l'analyse de la couche "Authentification" et la corrélation entre les échecs massifs et la première session réussie.
+
+1. **Analyse des sessions** : Identification des utilisateurs connectés et de leur provenance.
+2. **Examen des journaux d'authentification** : Recherche de patterns de Brute Force.
+3. **Audit des privilèges** : Vérification de l'utilisation de `sudo` après la connexion.
+
+### C. Découvertes & Commandes clés
+
+| Cible de l'analyse | Commande utilisée | Trace identifiée |
+| --- | --- | --- |
+| **Sessions actives** | `last -a | head` | Connexion de `employe` depuis l'IP de `attacker_pc`. |
+| **Tentatives SSH** | `grep "Failed password" /var/log/auth.log` | Plus de 500 échecs en 30 secondes pour l'utilisateur `employe`. |
+| **Succès critique** | `grep "Accepted password" /var/log/auth.log` | Une ligne "Accepted" suit immédiatement la rafale d'échecs. |
+| **Audit Système** | `ausearch -m USER_LOGIN -sv no` | Logs `auditd` confirmant les rejets systématiques avant l'intrusion. |
+
+> **Focus Escalade :** La commande `journalctl _COMM=sudo` révèle que l'attaquant a utilisé ses droits sudo immédiatement après sa connexion pour exécuter `systemctl stop nginx`.
+
+### D. Chronologie de l'incident
+
+1. **[T-5 min] Reconnaissance :** Scan de ports (Nmap) détecté dans les logs si un IDS était présent.
+2. **[T-4 min] Attaque brute :** Rafale d'échecs d'authentification SSH (Hydra).
+3. **[T-2 min] Intrusion :** Authentification réussie pour le compte `employe`.
+4. **[T-1 min] Action malveillante :** Exécution de `sudo systemctl stop nginx`.
+5. **[T-0] Persistance :** Création d'un script `malware_dropper.sh` dans `/tmp`.
+
+### E. Recommandations
+
+* **Technique :** Désactiver l'authentification par mot de passe au profit de clés SSH (Ed25519).
+* **Sécurité active :** Déployer **Fail2Ban** pour bannir automatiquement les IPs après 3 échecs.
+* **Hygiène :** Forcer une rotation des mots de passe et revoir les droits sudo (principe du moindre privilège).
+
+---
+
+## 4.2 Scénario 2 : Arrêt de service et Saturation Disque
+
+### A. Contexte
+
+Le monitoring indique une indisponibilité totale du serveur web. Les premières constatations indiquent une saturation critique de la partition `/var/log`, empêchant le bon fonctionnement des services système.
+
+### B. Méthodologie d'investigation
+
+L'investigation se concentre sur la corrélation entre l'état des services et l'intégrité du système de fichiers.
+
+1. **Diagnostic de service** : Analyse des causes d'arrêt via `systemctl`.
+2. **Analyse volumétrique** : Identification des fichiers responsables de la saturation.
+3. **Traçage de l'origine** : Utilisation des métadonnées de fichiers (timestamps) pour identifier l'auteur.
+
+### C. Découvertes & Commandes clés
+
+#### 1. Analyse du service et des droits
+
+* **Commande :** `systemctl status nginx` -> Indique `inactive (dead)`.
+* **Traçage Sudo :** `journalctl _COMM=sudo | grep nginx`
+* **Résultat :** Identification formelle de l'utilisateur `employe` comme auteur de l'arrêt volontaire du service.
+
+#### 2. Forensic du système de fichiers
+
+* **Occupation globale :** `df -h` montre `/` à 100%.
+* **Localisation du "glouton" :** `du -ah /var/log | sort -rh | head -n 5`
+* **Trace :** Découverte du fichier `/var/log/gros_fichier.log` pesant **1 Go**.
+
+#### 3. Analyse Temporelle (Timestamps)
+
+* **Commande :** `stat /var/log/gros_fichier.log`
+* **Observation :** La date de création (`Birth`) coïncide à quelques secondes près avec l'arrêt du service Nginx, confirmant une action coordonnée.
+
+### D. Chronologie de l'incident
+
+* **14:02:10 :** Commande `sudo systemctl stop nginx` validée.
+* **14:02:45 :** Lancement de `fallocate` pour créer le fichier de 1 Go.
+* **14:03:15 :** saturation de la table des inodes et de l'espace disque.
+* **14:04:00 :** Les services `rsyslog` et `auditd` commencent à générer des erreurs d'écriture ("No space left on device").
+
+### E. Recommandations
+
+* **Cloisonnement :** Mettre en place des partitions séparées pour `/var/log` et `/home` afin d'éviter qu'une saturation de logs n'impacte le système (`/`).
+* **Quotas :** Activer les quotas disques pour limiter la capacité de nuisance d'un compte utilisateur compromis.
+* **Audit :** Restreindre les privilèges sudo : un utilisateur "employé" ne doit pas avoir le droit d'utiliser des outils de manipulation de fichiers système ou d'arrêter des services critiques.
+
+---
+
+### Synthèse des outils Forensiques utilisés
+
+| Outil | Utilité dans l'investigation |
+| --- | --- |
+| **`journalctl`** | Centralisation des logs, filtrage par unité (`-u`) et temps. |
+| **`last / lastb`** | Historique des connexions réussies et échouées. |
+| **`ausearch`** | Interrogation précise de la base de données `auditd`. |
+| **`stat`** | Récupération des MAC times (Modify, Access, Change). |
+| **`grep / awk`** | Extraction de patterns (IPs, échecs) dans les fichiers plats. |
+
+---
+
