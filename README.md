@@ -319,6 +319,18 @@ Chaque cycle garantit que la donnée a quitté la RAM pour le stockage physique.
 
 ---
 
+### 4. Script ruby générant un rapport d'analyse de processus :
+
+Script disponible dans le dossier `proc_perf_diag/audit_proc/audit_proc.rb`.
+
+#### Captures d'écrans: exemple d'utulisation du script : 
+
+![photo1](images/analyseProc1.png)
+![photo2](images/analyseProc2.png)
+![photo3](images/analyseProc3.png)
+![photo4](images/analyseProc4.png)
+
+---
 ## Diagnostic Réseau
 
 ### Scénarios de diagnostic
