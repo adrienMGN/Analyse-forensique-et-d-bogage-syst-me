@@ -39,9 +39,6 @@ htop -p $(pgrep infinite_loop)
 * En lançant 4 instances, on mobilise 4 cœurs (soit 25% du total). Le système reste fluide car il dispose de 12 cœurs libres pour les autres tâches.
 
 > **Le risque de la "Fork Bomb" :** > Contrairement à une boucle simple, une Fork Bomb se réplique de manière exponentielle. Elle sature la totalité des cœurs et la table des processus, provoquant un gel (**freeze**) complet de la machine.
-C’est une excellente intuition. Dans un rapport de forensique, comprendre la différence entre un processus qui "consomme" (CPU Bound) et un processus qui "attend" (I/O ou Timer Bound) est fondamental.
-
-Voici comment intégrer cette analyse à ta section 2.1, en gardant ton style :
 
 ---
 
@@ -538,3 +535,31 @@ dig @8.8.8.8 google.com
 cat /etc/resolv.conf
 resolvectl status
 ```
+
+---
+
+## 3. Script Ruby d'Audit Réseau Automatisé
+
+Le script `audit_network/audit_net.rb` a été conçu pour offrir une visibilité immédiate sur la surface d'exposition d'une machine Linux. Il automatise la corrélation entre les sockets ouvertes, l'état des interfaces et la cohérence du routage.
+
+### 3.1 Capacités détaillées du script
+
+Le script articule son diagnostic autour de **trois axes critiques** :
+
+#### A. Analyse de la Surface d'Attaque (Services Exposés)
+
+* **Filtrage Intelligent :** Le script distingue les services limités à l'interface de boucle locale (`localhost`) des services exposés sur toutes les interfaces (`0.0.0.0` ou `::`).
+* **Alerte sur Ports Sensibles :** Il intègre une liste de ports à haut risque (SSH, FTP, Bases de données, etc.) et lève une alerte visuelle si ces derniers sont accessibles depuis l'extérieur.
+
+#### B. Détection de Signaux Faibles (Connexions Suspectes)
+
+* **Filtrage RFC 1918 :** Il ignore les flux internes (plages `10.x`, `192.168.x`, etc.) pour isoler uniquement les connexions établies vers l'Internet public.
+* **Ciblage des Ports Hauts :** Il identifie les connexions sortantes vers des ports de destination inhabituellement élevés (**> 40000**), souvent caractéristiques de flux de type *Command & Control* (C2) ou d'exfiltration de données.
+
+#### C. Vérification de l'Intégrité de la Configuration
+
+* **Cohérence L2/L3 :** Détecte les interfaces réseau activées (`UP`) mais dépourvues d'adresse IP (signe d'un échec DHCP ou d'une erreur de configuration statique).
+* **Chaîne de Résolution :** Vérifie la présence d'une route par défaut (indispensable pour la connectivité externe) et la validité du fichier `/etc/resolv.conf`.
+* **État du Filtrage :** Interroge `iptables` (si exécuté avec les privilèges `root`) pour confirmer la présence de règles de filtrage actives.
+
+---
